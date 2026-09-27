@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/widgets.dart';
 
 Map<String, dynamic> _item(Map e) => Map<String, dynamic>.from(e);
 
@@ -181,40 +182,103 @@ class _ProviderCatalogScreenState
           services.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text(apiMessage(e)),
-            data: (rows) => Column(
+            data: (rows) {
+            if (rows.isEmpty) {
+              return const EmptyState(
+                message: 'No services yet. Add your first one above.',
+                icon: Icons.home_repair_service_outlined,
+              );
+            }
+            return Column(
               children: [
-                if (rows.isEmpty) const Text('No services yet.'),
                 for (final row in rows)
-                  SwitchListTile(
-                    title: Text('${row['title']}'),
-                    subtitle: Text('${row['price']}'),
-                    value: (row['is_active'] ?? false) == true,
-                    onChanged: (_) => _guard(
-                      () => api.serviceToggle(row['id'] as int),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('${row['title']}',
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w700)),
+                                Text(
+                                    '${row['price'] ?? ''}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall),
+                              ],
+                            ),
+                          ),
+                          StatusChip(
+                              status: (row['is_active'] ??
+                                          false) ==
+                                      true
+                                  ? 'active'
+                                  : 'paused'),
+                          Switch(
+                            value: (row['is_active'] ??
+                                    false) ==
+                                true,
+                            onChanged: (_) => _guard(
+                              () => api.serviceToggle(
+                                  row['id'] as int),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],
-            ),
+            );
+          },
           ),
           const SizedBox(height: 16),
           Text('Workers', style: Theme.of(context).textTheme.titleMedium),
           workers.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text(apiMessage(e)),
-            data: (rows) => Column(
+            data: (rows) {
+            if (rows.isEmpty) {
+              return const EmptyState(
+                message: 'No workers yet. Add your team below.',
+                icon: Icons.group_outlined,
+              );
+            }
+            return Column(
               children: [
-                if (rows.isEmpty) const Text('No workers yet.'),
                 for (final row in rows)
-                  SwitchListTile(
-                    title: Text('${row['name']}'),
-                    subtitle: Text('${row['phone'] ?? ''}'),
-                    value: (row['is_active'] ?? false) == true,
-                    onChanged: (_) => _guard(
-                      () => api.workerToggle(row['id'] as int),
+                  Card(
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        child: Text(
+                            '${row['name'] ?? '?'}'.isEmpty
+                                ? '?'
+                                : '${row['name']}'
+                                    .trim()[0]
+                                    .toUpperCase()),
+                      ),
+                      title: Text('${row['name']}'),
+                      subtitle:
+                          Text('${row['phone'] ?? ''}'),
+                      trailing: Switch(
+                        value:
+                            (row['is_active'] ?? false) ==
+                                true,
+                        onChanged: (_) => _guard(
+                          () => api.workerToggle(
+                              row['id'] as int),
+                        ),
+                      ),
                     ),
                   ),
               ],
-            ),
+            );
+          },
           ),
           const SizedBox(height: 8),
           Row(

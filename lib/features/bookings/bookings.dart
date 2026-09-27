@@ -7,9 +7,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
+import '../../core/nav.dart';
+import '../../core/widgets.dart';
 
 class ProviderBooking {
   ProviderBooking({
@@ -73,53 +74,152 @@ final bookingsApiProvider = Provider<BookingsApi>(
   (ref) => BookingsApi(ref.watch(dioProvider)),
 );
 
+final bookingsFilterProvider = StateProvider<String?>((ref) => null);
+
 final bookingsProvider = FutureProvider<List<ProviderBooking>>((ref) async {
-  return ref.watch(bookingsApiProvider).bookings();
+  return ref
+      .watch(bookingsApiProvider)
+      .bookings(status: ref.watch(bookingsFilterProvider));
 });
+
+const _bookingTabs = <String?>[
+  null,
+  'placed',
+  'accepted',
+  'ongoing',
+  'completed',
+  'cancelled'
+];
+
+String _tabLabel(String? status) {
+  return switch (status) {
+    null => 'All',
+    'placed' => 'New',
+    'accepted' => 'Accepted',
+    'ongoing' => 'Ongoing',
+    'completed' => 'Completed',
+    'cancelled' => 'Cancelled',
+    _ => status,
+  };
+}
 
 class BookingsScreen extends ConsumerWidget {
   const BookingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(bookingsFilterProvider);
     final bookings = ref.watch(bookingsProvider);
 
-    return bookings.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(apiMessage(e)),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => ref.invalidate(bookingsProvider),
-              child: const Text('Retry'),
-            ),
-          ],
+    return Column(
+      children: [
+        SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            children: [
+              for (final tab in _bookingTabs)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(_tabLabel(tab)),
+                    selected: filter == tab,
+                    onSelected: (_) => ref
+                        .read(bookingsFilterProvider.notifier)
+                        .state = tab,
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
-      data: (rows) => RefreshIndicator(
-        onRefresh: () async => ref.invalidate(bookingsProvider),
-        child: rows.isEmpty
-            ? const Center(child: Text('No bookings.'))
-            : ListView(
-                padding: const EdgeInsets.all(16),
+        Expanded(
+          child: bookings.when(
+            loading: () =>
+                const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final booking in rows)
-                    Card(
-                      child: ListTile(
-                        title: Text('${booking.number} · ${booking.customer}'),
-                        subtitle: Text(
-                          '${booking.status} · ${booking.total.toStringAsFixed(2)}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push('/booking/${booking.id}'),
-                      ),
-                    ),
+                  Text(apiMessage(e)),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () =>
+                        ref.invalidate(bookingsProvider),
+                    child: const Text('Retry'),
+                  ),
                 ],
               ),
-      ),
+            ),
+            data: (rows) => RefreshIndicator(
+              onRefresh: () async =>
+                  ref.invalidate(bookingsProvider),
+              child: rows.isEmpty
+                  ? const EmptyState(
+                      message:
+                          'No bookings here. New requests pop up automatically.',
+                      icon: Icons.event_note_outlined,
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        for (final booking in rows)
+                          Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => context.safePush(
+                                  '/booking/${booking.id}'),
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${booking.number} · ${booking.customer}',
+                                            style: const TextStyle(
+                                                fontWeight:
+                                                    FontWeight
+                                                        .w700),
+                                          ),
+                                        ),
+                                        StatusChip(
+                                            status:
+                                                booking.status),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Total ${booking.total.toStringAsFixed(2)}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                        const Spacer(),
+                                        const Icon(
+                                            Icons.chevron_right,
+                                            size: 20),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -171,35 +271,107 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                '${booking['number'] ?? ''} · $status',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text('Customer: ${booking['customer'] ?? '—'}'),
-              Text('Address: ${booking['address'] ?? '—'}'),
-              Text('Total ${booking['total']}'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final move in nextMoves(status))
-                    FilledButton.tonal(
-                      onPressed: _busy ? null : () => _move(move),
-                      child: Text(move),
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(bookingsProvider);
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${booking['number'] ?? 'Booking #${booking['id']}'}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge,
+                              ),
+                            ),
+                            StatusChip(status: status),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total ${booking['total'] ?? ''}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall,
+                        ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text('Timeline', style: Theme.of(context).textTheme.titleMedium),
-              for (final entry in timeline)
-                ListTile(
-                  leading: const Icon(Icons.circle, size: 10),
-                  title: Text('${entry['to'] ?? entry['to_status']}'),
+                  ),
                 ),
-            ],
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading:
+                        const Icon(Icons.person_outline),
+                    title: Text(
+                        '${booking['customer'] ?? 'Customer'}'),
+                    subtitle: Text(
+                        '${booking['address'] ?? 'No address on file'}'),
+                  ),
+                ),
+                if (nextMoves(status).isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final move
+                          in nextMoves(status))
+                        FilledButton.tonal(
+                          onPressed: _busy
+                              ? null
+                              : () => _move(move),
+                          child: Text(move),
+                        ),
+                    ],
+                  ),
+                ],
+                if (timeline.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text('Timeline',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium),
+                          const SizedBox(height: 8),
+                          for (final entry in timeline)
+                            ListTile(
+                              contentPadding:
+                                  EdgeInsets.zero,
+                              leading: Icon(
+                                Icons.circle,
+                                size: 10,
+                                color: StatusChip.colorFor(
+                                    '${entry['to'] ?? entry['to_status'] ?? ''}'),
+                              ),
+                              title: Text(
+                                  '${entry['to'] ?? entry['to_status'] ?? ''}'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 80),
+              ],
+            ),
           );
         },
       ),
