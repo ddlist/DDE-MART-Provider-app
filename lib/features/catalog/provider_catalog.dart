@@ -1,4 +1,4 @@
-// DDE-Mart provider app — services + workers management (original).
+// DDE-Mart provider app — services + workers management.
 //
 // Own bookable services (CRUD + active toggle) and staff workers (CRUD +
 // toggle). Matches GET|POST|PUT /provider/services|workers (+toggle).
@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/theme.dart';
 import '../../core/widgets.dart';
 
 Map<String, dynamic> _item(Map e) => Map<String, dynamic>.from(e);
@@ -130,6 +131,14 @@ class _ProviderCatalogScreenState
     final services = ref.watch(providerServicesProvider);
     final workers = ref.watch(providerWorkersProvider);
     final api = ref.watch(providerCatalogApiProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    final serviceRows = services.valueOrNull;
+    final workerRows = workers.valueOrNull;
+    final activeServices =
+        serviceRows?.where((r) => (r['is_active'] ?? false) == true).length;
+    final activeWorkers =
+        workerRows?.where((r) => (r['is_active'] ?? false) == true).length;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -137,182 +146,303 @@ class _ProviderCatalogScreenState
         ref.invalidate(providerWorkersProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         children: [
-          Text('Services', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _serviceTitle,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
+          GradientHeader(
+            title: 'Catalog',
+            subtitle: serviceRows == null || workerRows == null
+                ? 'Services and team'
+                : '${serviceRows.length} services · ${workerRows.length} workers',
+            trailing: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.2),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 110,
-                child: TextField(
-                  controller: _servicePrice,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Price'),
-                ),
+              child: const Icon(
+                Icons.inventory_2_outlined,
+                color: Colors.white,
+                size: 22,
               ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: _busy
-                    ? null
-                    : () {
-                        final price =
-                            double.tryParse(_servicePrice.text.trim()) ?? -1;
-                        if (_serviceTitle.text.trim().isEmpty || price < 0) {
-                          return;
-                        }
-                        _guard(() => api.serviceStore(
-                              title: _serviceTitle.text.trim(),
-                              price: price,
-                            )).then((_) {
-                          _serviceTitle.clear();
-                          _servicePrice.clear();
-                        });
-                      },
-              ),
-            ],
+            ),
           ),
-          services.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text(apiMessage(e)),
-            data: (rows) {
-            if (rows.isEmpty) {
-              return const EmptyState(
-                message: 'No services yet. Add your first one above.',
-                icon: Icons.home_repair_service_outlined,
-              );
-            }
-            return Column(
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final row in rows)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text('${row['title']}',
-                                    style: const TextStyle(
-                                        fontWeight:
-                                            FontWeight.w700)),
-                                Text(
-                                    '${row['price'] ?? ''}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall),
-                              ],
-                            ),
-                          ),
-                          StatusChip(
-                              status: (row['is_active'] ??
-                                          false) ==
-                                      true
-                                  ? 'active'
-                                  : 'paused'),
-                          Switch(
-                            value: (row['is_active'] ??
-                                    false) ==
-                                true,
-                            onChanged: (_) => _guard(
-                              () => api.serviceToggle(
-                                  row['id'] as int),
-                            ),
-                          ),
-                        ],
-                      ),
+                Row(
+                  children: [
+                    StatCard(
+                      label: 'Services',
+                      value: '${serviceRows?.length ?? '–'}',
+                      icon: Icons.home_repair_service_outlined,
                     ),
-                  ),
-              ],
-            );
-          },
-          ),
-          const SizedBox(height: 16),
-          Text('Workers', style: Theme.of(context).textTheme.titleMedium),
-          workers.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text(apiMessage(e)),
-            data: (rows) {
-            if (rows.isEmpty) {
-              return const EmptyState(
-                message: 'No workers yet. Add your team below.',
-                icon: Icons.group_outlined,
-              );
-            }
-            return Column(
-              children: [
-                for (final row in rows)
-                  Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        child: Text(
-                            '${row['name'] ?? '?'}'.isEmpty
-                                ? '?'
-                                : '${row['name']}'
-                                    .trim()[0]
-                                    .toUpperCase()),
-                      ),
-                      title: Text('${row['name']}'),
-                      subtitle:
-                          Text('${row['phone'] ?? ''}'),
-                      trailing: Switch(
-                        value:
-                            (row['is_active'] ?? false) ==
-                                true,
-                        onChanged: (_) => _guard(
-                          () => api.workerToggle(
-                              row['id'] as int),
+                    const SizedBox(width: 12),
+                    StatCard(
+                      label: 'Active',
+                      value: '${activeServices ?? '–'}',
+                      icon: Icons.check_circle_outline,
+                      tint: DdeProviderTheme.success,
+                    ),
+                    const SizedBox(width: 12),
+                    StatCard(
+                      label: 'Workers',
+                      value: workerRows == null
+                          ? '–'
+                          : '${activeWorkers ?? 0}/${workerRows.length}',
+                      icon: Icons.group_outlined,
+                      tint: DdeProviderTheme.accent,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('Services',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                SleekCard(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _serviceTitle,
+                          decoration: const InputDecoration(
+                              labelText: 'Title'),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: _servicePrice,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          decoration: const InputDecoration(
+                              labelText: 'Price'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add_circle,
+                            color: scheme.primary),
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                final price = double.tryParse(
+                                        _servicePrice.text.trim()) ??
+                                    -1;
+                                if (_serviceTitle.text
+                                        .trim()
+                                        .isEmpty ||
+                                    price < 0) {
+                                  return;
+                                }
+                                _guard(() => api.serviceStore(
+                                      title: _serviceTitle.text
+                                          .trim(),
+                                      price: price,
+                                    )).then((_) {
+                                  _serviceTitle.clear();
+                                  _servicePrice.clear();
+                                });
+                              },
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 8),
+                services.when(
+                  loading: () =>
+                      const ShimmerList(count: 2),
+                  error: (e, _) => Text(apiMessage(e)),
+                  data: (rows) {
+                    if (rows.isEmpty) {
+                      return const EmptyState(
+                        message:
+                            'No services yet. Add your first one above.',
+                        icon: Icons
+                            .home_repair_service_outlined,
+                      );
+                    }
+                    return Column(
+                      children: [
+                        for (final row in rows)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: 8),
+                            child: SleekCard(
+                              padding:
+                                  const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding:
+                                        const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: scheme.primary
+                                          .withValues(alpha: 0.12),
+                                    ),
+                                    child: Icon(
+                                      Icons
+                                          .home_repair_service_outlined,
+                                      size: 20,
+                                      color: scheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment
+                                              .start,
+                                      children: [
+                                        Text('${row['title']}',
+                                            style: Theme.of(
+                                                    context)
+                                                .textTheme
+                                                .titleSmall),
+                                        Text(
+                                            '${row['price'] ?? ''}',
+                                            style: Theme.of(
+                                                    context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                    color: scheme
+                                                        .onSurfaceVariant)),
+                                      ],
+                                    ),
+                                  ),
+                                  StatusChip(
+                                      status: (row['is_active'] ??
+                                                  false) ==
+                                              true
+                                          ? 'active'
+                                          : 'paused'),
+                                  Switch(
+                                    value: (row['is_active'] ??
+                                            false) ==
+                                        true,
+                                    onChanged: (_) => _guard(
+                                      () => api.serviceToggle(
+                                          row['id'] as int),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text('Workers',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                workers.when(
+                  loading: () =>
+                      const ShimmerList(count: 2),
+                  error: (e, _) => Text(apiMessage(e)),
+                  data: (rows) {
+                    if (rows.isEmpty) {
+                      return const EmptyState(
+                        message:
+                            'No workers yet. Add your team below.',
+                        icon: Icons.group_outlined,
+                      );
+                    }
+                    return Column(
+                      children: [
+                        for (final row in rows)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: 8),
+                            child: SleekCard(
+                              padding: EdgeInsets.zero,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: scheme.primary
+                                      .withValues(alpha: 0.15),
+                                  foregroundColor:
+                                      scheme.primary,
+                                  child: Text(
+                                      '${row['name'] ?? '?'}'
+                                                  .isEmpty
+                                          ? '?'
+                                          : '${row['name']}'
+                                              .trim()[0]
+                                              .toUpperCase()),
+                                ),
+                                title:
+                                    Text('${row['name']}'),
+                                subtitle: Text(
+                                    '${row['phone'] ?? ''}'),
+                                trailing: Switch(
+                                  value: (row['is_active'] ??
+                                          false) ==
+                                      true,
+                                  onChanged: (_) => _guard(
+                                    () => api.workerToggle(
+                                        row['id'] as int),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                SleekCard(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _workerName,
+                          decoration: const InputDecoration(
+                              labelText: 'Worker name'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _workerPhone,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                              labelText: 'Phone'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add_circle,
+                            color: scheme.primary),
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                if (_workerName.text
+                                    .trim()
+                                    .isEmpty) {
+                                  return;
+                                }
+                                _guard(() => api.workerStore(
+                                      name: _workerName.text
+                                          .trim(),
+                                      phone: _workerPhone.text
+                                          .trim(),
+                                    )).then((_) {
+                                  _workerName.clear();
+                                  _workerPhone.clear();
+                                });
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 80),
               ],
-            );
-          },
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _workerName,
-                  decoration: const InputDecoration(labelText: 'Worker name'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _workerPhone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone'),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: _busy
-                    ? null
-                    : () {
-                        if (_workerName.text.trim().isEmpty) return;
-                        _guard(() => api.workerStore(
-                              name: _workerName.text.trim(),
-                              phone: _workerPhone.text.trim(),
-                            )).then((_) {
-                          _workerName.clear();
-                          _workerPhone.clear();
-                        });
-                      },
-              ),
-            ],
+            ),
           ),
         ],
       ),

@@ -10,6 +10,7 @@ import 'core/api_client.dart';
 import 'core/auth_store.dart';
 import 'core/config.dart';
 import 'core/gate.dart';
+import 'core/widgets.dart';
 import 'features/account/payouts_profile.dart';
 import 'features/auth/provider_login_screen.dart';
 import 'features/bookings/bookings.dart';
@@ -133,9 +134,9 @@ class ProviderShell extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(child: child),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (value) {
+      bottomNavigationBar: SleekNavBar(
+        index: index,
+        onTap: (value) {
           switch (value) {
             case 0:
               context.go('/bookings');
@@ -147,12 +148,6 @@ class ProviderShell extends StatelessWidget {
               context.go('/profile');
           }
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.event_note_outlined), label: 'Bookings'),
-          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Catalog'),
-          NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payouts'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
       ),
     );
   }
