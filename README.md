@@ -1,34 +1,71 @@
-# DDE-Mart provider app (clean-room rebuild)
+# DDE-Mart Provider App
 
-Fresh Flutter app against `admin-panel` API v1 provider surfaces
-(`docs/api-v1.md`, Provider app section). No legacy code.
+The service-provider Flutter app for the DDE-Mart platform: bookings,
+services & workers catalog, payouts and profile — against one backend API.
+
+- Backend: [DDE-MART-BACKEND](https://github.com/ddlist/DDE-MART-BACKEND) (`master`)
+- API reference: `admin-panel/docs/api-v1.md` (Provider app section)
+
+## Features
+
+- **Auth** — OTP sign-in, profile with avatar upload, sign out.
+- **Bookings inbox** — status filters, booking detail with timeline,
+  machine moves (placed → accepted/rejected/cancelled → ongoing →
+  completed), worker assignment support.
+- **Catalog** — services and workers with create/edit/toggle flows.
+- **Payouts** — history + requests (bank/paypal/stripe/razorpay/
+  flutterwave/cash).
+- **Stories** — promotional strip on the bookings tab.
+- **Platform** — launch gate (`/app-config`), FCM push (`providers`
+  topic), dark mode, runtime permission flows (photos, notifications).
+
+## Setup
+
+Prerequisites: Flutter 3.41+ (`flutter doctor` clean), Android Studio or
+Xcode, and the backend running (see backend README).
+
+```sh
+git clone https://github.com/ddlist/DDE-MART-Provider-app.git provider
+cd provider
+flutter pub get
+```
 
 ## Run
 
 ```sh
+# Herd/Valet domain (default baked into lib/core/config.dart):
 flutter run --dart-define=API_BASE_URL=http://dde-mart-admin.test/api/v1
+
+# Android emulator when .test doesn't resolve there:
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+
+# Physical phone (same Wi-Fi; backend on 0.0.0.0:8000):
+flutter run --dart-define=API_BASE_URL=http://<pc-lan-ip>:8000/api/v1
 ```
 
-## What's wired
+Test accounts: create the provider in the admin panel (Providers page,
+status `active`), then sign in with phone + OTP. Demo OTP codes appear
+in the backend log outside production. Seed demo data with
+`php artisan db:seed --class=DemoSeeder` (provider `0302222222`).
 
-- Launch gate (`/app-config`, `provider` audience) + maintenance/update screens.
-- OTP sign-in, profile, sign out.
-- Bookings inbox with status filter entry, detail timeline, machine moves
-  (placed → accepted/rejected/cancelled → ongoing → completed).
-- Catalog: service create + active toggles, worker create + toggles.
-- Payouts: history + request.
-- Push: topic `providers` (see FIREBASE_SETUP.md).
+## Release build
 
-## Next (not yet)
+```sh
+flutter build appbundle --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
+flutter build ipa      --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
+```
 
-- Service/worker edit forms (create + toggle today; full edit via panel).
-- Booking assignment to a specific worker (backend supports `worker_id`;
-  assignment UI pending).
-- Firebase native files per environment (not in repo).
+Push needs `google-services.json` / `GoogleService-Info.plist` per
+environment (see `FIREBASE_SETUP.md`) — never committed.
 
 ## Verify
 
 ```sh
-flutter analyze
-flutter test
+flutter analyze   # clean
+flutter test      # 14 tests: bookings, API parity, session, nav guards, boot
 ```
+
+## Support
+
+Installation, tech support, customization: **shariqq.com@gmail.com** ·
+WhatsApp **@shareeq9**.
