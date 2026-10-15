@@ -1,4 +1,4 @@
-# DDE-Mart Provider App
+# Hometry Provider App
 
 The service-provider Flutter app for the DDE-Mart platform: bookings,
 services & workers catalog, payouts and profile — against one backend API.
@@ -32,8 +32,17 @@ flutter pub get
 
 ## Run
 
+Default API is live (`https://admin.hometry.in/api/v1`, baked into
+`lib/core/config.dart`) — no `--dart-define` needed:
+
 ```sh
-# Herd/Valet domain (default baked into lib/core/config.dart):
+flutter run
+```
+
+Local override examples:
+
+```sh
+# Herd/Valet domain:
 flutter run --dart-define=API_BASE_URL=http://dde-mart-admin.test/api/v1
 
 # Android emulator when .test doesn't resolve there:
@@ -76,6 +85,6 @@ Built by [DDLIST](https://ddlist.github.io).
 
 ## License
 
-DDLIST Commercial Source License v1.0 � see [LICENSE](LICENSE). You may
+DDLIST Commercial Source License v1.0 � see [LICENSE](LICENSE). You may
 use, run, edit, and modify the software for personal or business use,
 but you may not resell, redistribute, or republish it.
